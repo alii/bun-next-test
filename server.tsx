@@ -16,7 +16,7 @@ const requireFromStandaloneServer = (path: string) =>
 const _document = requireFromStandaloneServer("pages/_document.js");
 const page = requireFromStandaloneServer("app/page.js");
 
-requireFromStandaloneServer("app/page_client-reference-manifest.js"); // defines __RSC_MANIFEST
+requireFromStandaloneServer("app/page_client-reference-manifest.js"); // defines globalThis.__RSC_MANIFEST
 declare const __RSC_MANIFEST: Record<string, ClientReferenceManifest>;
 
 const buildManifest = await import("./.next/build-manifest.json", {
@@ -113,6 +113,6 @@ Bun.serve({
 			page: PAGE,
 		});
 
-		return await render(hint);
+		return render(hint);
 	},
 });
