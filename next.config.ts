@@ -1,7 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+	output: "standalone",
+	experimental: {
+		externalDir: true,
+	},
+	// webpack: (config, { isServer }) => {
+	// 	if (isServer) {
+	// 		config.externals.push("react", "react-dom");
+	// 	}
+
+	// 	return config;
+	// },
 };
 
 export default nextConfig;
