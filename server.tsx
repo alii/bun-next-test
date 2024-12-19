@@ -17,7 +17,7 @@ const _document = requireFromStandaloneServer("pages/_document.js");
 const page = requireFromStandaloneServer("app/page.js");
 
 requireFromStandaloneServer("app/page_client-reference-manifest.js"); // defines __RSC_MANIFEST
-declare const __RSC_MANIFEST: ClientReferenceManifest;
+declare const __RSC_MANIFEST: Record<string, ClientReferenceManifest>;
 
 const buildManifest = await import("./.next/build-manifest.json", {
 	with: { type: "json" },
