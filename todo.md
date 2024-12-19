@@ -1,0 +1,4 @@
+- [ ] implement the BaseServer (can remove a lot of unecessary stuff for performance)
+- [ ] make a faster alternative to `getRender`
+- [ ] evaluate perf gain
+- [ ] detect which routes can be mounted to static: {} and DO IT!

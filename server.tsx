@@ -53,8 +53,58 @@ const render = getRender({
 	clientReferenceManifest: __RSC_MANIFEST[PAGE],
 });
 
+const staticAssets: Record<`/${string}`, Response> = {};
+const assets = await Array.fromAsync(
+	new Bun.Glob(".next/static/**/*").scan({
+		dot: true,
+		absolute: true,
+	})
+);
+
+for await (const asset of assets) {
+	const f = Bun.file(asset);
+	const buf = await f.arrayBuffer();
+
+	const indexOfDotNext = asset.indexOf(".next");
+	const restAfterDotNext = asset.slice(indexOfDotNext + 6);
+
+	staticAssets[`/_next/${restAfterDotNext}`] = new Response(buf, {
+		headers: {
+			"Content-Type": f.type,
+		},
+	});
+}
+
+const publicAssets = await Array.fromAsync(
+	new Bun.Glob("public/**/*").scan({
+		dot: true,
+		absolute: true,
+	})
+);
+
+for await (const asset of publicAssets) {
+	const f = Bun.file(asset);
+	const buf = await f.arrayBuffer();
+
+	const indexOfPublic = asset.indexOf("public");
+	const restAfterPublic = asset.slice(indexOfPublic + 7);
+
+	staticAssets[`/${restAfterPublic}`] = new Response(buf, {
+		headers: {
+			"Content-Type": f.type,
+		},
+	});
+}
+
 Bun.serve({
 	port: 8080,
+
+	error: async error => {
+		console.log(error);
+		return new Response("failed");
+	},
+
+	static: staticAssets,
 
 	fetch: async request => {
 		const hint = new NextRequestHint({
@@ -63,6 +113,6 @@ Bun.serve({
 			page: PAGE,
 		});
 
-		return render(hint);
+		return await render(hint);
 	},
 });
