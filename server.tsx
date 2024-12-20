@@ -99,20 +99,32 @@ for await (const asset of publicAssets) {
 Bun.serve({
 	port: 8080,
 
-	error: async error => {
-		console.log(error);
-		return new Response("failed");
-	},
+	// error: async error => {
+	// 	console.log(error, "test");
+	// 	return new Response("failed");
+	// },
 
 	static: staticAssets,
 
 	fetch: async request => {
-		const hint = new NextRequestHint({
-			init: request,
-			input: request,
-			page: PAGE,
-		});
+		try {
+			const hint = new NextRequestHint({
+				init: request,
+				input: request,
+				page: PAGE,
+			});
 
-		return render(hint);
+			const response = await render(hint);
+
+			return response;
+		} catch (e) {
+			console.log("error");
+			console.log(e);
+			return new Response("failed");
+		}
 	},
 });
+
+// process.on("unhandledRejection", e => {
+// 	console.trace(e);
+// });
