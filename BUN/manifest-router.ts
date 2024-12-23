@@ -6,15 +6,17 @@ import { getRouteRegex } from "next/dist/shared/lib/router/utils/route-regex";
 interface RouteMatch {
 	modulePath: string;
 	params: Params;
+	page: string;
 }
 
 interface CompiledRoute {
 	matcher: (pathname: string) => false | Params;
 	modulePath: string;
+	page: string;
 }
 
 export class ManifestRouter {
-	private staticRoutes = new Map<string, string>();
+	private staticRoutes = new Map<string, { modulePath: string; page: string }>();
 	private dynamicRoutes = new Map<string, CompiledRoute>();
 
 	constructor(private readonly routesManifest: Record<string, string>) {
@@ -28,7 +30,11 @@ export class ManifestRouter {
 				.replace(/\/page$/, "");
 
 			if (!normalizedRoute.includes("[")) {
-				this.staticRoutes.set(normalizedRoute, modulePath);
+				this.staticRoutes.set(normalizedRoute, {
+					modulePath,
+					page: route,
+				});
+
 				continue;
 			}
 
@@ -38,6 +44,7 @@ export class ManifestRouter {
 			this.dynamicRoutes.set(normalizedRoute, {
 				matcher,
 				modulePath,
+				page: route,
 			});
 		}
 	}
@@ -50,8 +57,9 @@ export class ManifestRouter {
 		const staticMatch = this.staticRoutes.get(pathname);
 		if (staticMatch) {
 			return {
-				modulePath: staticMatch,
+				modulePath: staticMatch.modulePath,
 				params: {},
+				page: staticMatch.page,
 			};
 		}
 
@@ -62,6 +70,7 @@ export class ManifestRouter {
 				return {
 					modulePath: route.modulePath,
 					params,
+					page: route.page,
 				};
 			}
 		}
@@ -71,6 +80,7 @@ export class ManifestRouter {
 			return {
 				modulePath: notFoundModule,
 				params: {},
+				page: "/_not-found/page",
 			};
 		}
 
