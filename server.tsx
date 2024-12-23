@@ -6,6 +6,7 @@ import { getRender } from "next/dist/build/webpack/loaders/next-edge-ssr-loader/
 import { ClientReferenceManifest } from "next/dist/build/webpack/plugins/flight-manifest-plugin";
 import { renderToHTMLOrFlight as renderToHTML } from "next/dist/server/app-render/app-render";
 import { NextRequestHint } from "next/dist/server/web/adapter";
+import { ManifestRouter } from "./BUN/manifest-router";
 import { nextConfig } from "./config";
 
 const BUILD_ID = await Bun.file("./.next/BUILD_ID").text();
@@ -16,7 +17,6 @@ const requireFromStandaloneServer = (path: string) =>
 const _document = requireFromStandaloneServer("pages/_document.js");
 const page = requireFromStandaloneServer("app/page.js");
 
-requireFromStandaloneServer("app/page_client-reference-manifest.js"); // defines globalThis.__RSC_MANIFEST
 declare const __RSC_MANIFEST: Record<string, ClientReferenceManifest>;
 
 const buildManifest = await import("./.next/build-manifest.json", {
@@ -31,67 +31,53 @@ const reactLoadableManifest = (await import("./.next/react-loadable-manifest.jso
 	with: { type: "json" },
 })) as {};
 
-// TODO: Get from request/router
-const PAGE = "/page";
+const appPathsManifest = (await import("./.next/server/app-paths-manifest.json", {
+	with: { type: "json" },
+})) as {};
 
-const render = getRender({
-	pagesType: "app" as import("next/dist/lib/page-types").PAGE_TYPES,
-	dev: false,
-	page: PAGE,
-	appMod: {},
-	pageMod: page,
-	errorMod: {},
-	error500Mod: {},
-	Document: _document.default,
-	buildManifest,
-	reactLoadableManifest,
-	config: nextConfig,
-	buildId: BUILD_ID,
-	nextFontManifest: fontManifest,
-	incrementalCacheHandler: undefined,
-	renderToHTML,
-	clientReferenceManifest: __RSC_MANIFEST[PAGE],
+const router = new ManifestRouter(appPathsManifest, {
+	basePath: "",
+	i18n: {
+		defaultLocale: "en",
+		locales: ["en"],
+	},
 });
 
 const staticAssets: Record<`/${string}`, Response> = {};
-const assets = await Array.fromAsync(
-	new Bun.Glob(".next/static/**/*").scan({
-		dot: true,
-		absolute: true,
-	})
-);
 
-for await (const asset of assets) {
-	const f = Bun.file(asset);
-	const buf = await f.arrayBuffer();
+function toFile(mapPath: (path: string) => string) {
+	return (paths: string[]) => {
+		return paths.map(path => {
+			const f = Bun.file(path);
 
-	const indexOfDotNext = asset.indexOf(".next");
-	const restAfterDotNext = asset.slice(indexOfDotNext + 6);
-
-	staticAssets[`/_next/${restAfterDotNext}`] = new Response(buf, {
-		headers: {
-			"Content-Type": f.type,
-		},
-	});
+			return {
+				file: f,
+				path: mapPath(path),
+			};
+		});
+	};
 }
 
-const publicAssets = await Array.fromAsync(
-	new Bun.Glob("public/**/*").scan({
-		dot: true,
-		absolute: true,
-	})
-);
+const [publicFiles, assets] = await Promise.all([
+	Array.fromAsync(
+		new Bun.Glob("public/**/*").scan({
+			dot: true,
+		})
+	).then(toFile(path => path.replace("public", ""))),
 
-for await (const asset of publicAssets) {
-	const f = Bun.file(asset);
-	const buf = await f.arrayBuffer();
+	Array.fromAsync(
+		new Bun.Glob(".next/static/**/*").scan({
+			dot: true,
+		})
+	).then(toFile(path => path.replace(".next", "/_next"))),
+]);
 
-	const indexOfPublic = asset.indexOf("public");
-	const restAfterPublic = asset.slice(indexOfPublic + 7);
+for await (const i of [...publicFiles, ...assets]) {
+	const buf = await i.file.arrayBuffer();
 
-	staticAssets[`/${restAfterPublic}`] = new Response(buf, {
+	staticAssets[i.path as `/${string}`] = new Response(buf, {
 		headers: {
-			"Content-Type": f.type,
+			"content-type": i.file.type,
 		},
 	});
 }
@@ -107,15 +93,38 @@ Bun.serve({
 	static: staticAssets,
 
 	fetch: async request => {
+		const match = await router.resolveRoute(request);
+
+		console.log(match);
+
+		requireFromStandaloneServer("app/page_client-reference-manifest.js"); // defines globalThis.__RSC_MANIFEST
+
+		const render = getRender({
+			pagesType: "app" as import("next/dist/lib/page-types").PAGE_TYPES,
+			dev: false,
+			page: match?.params,
+			pageMod: page,
+			appMod: {},
+			errorMod: {},
+			error500Mod: {},
+			Document: _document.default,
+			buildManifest,
+			reactLoadableManifest,
+			config: nextConfig,
+			buildId: BUILD_ID,
+			nextFontManifest: fontManifest,
+			incrementalCacheHandler: undefined,
+			renderToHTML,
+			clientReferenceManifest: __RSC_MANIFEST[PAGE],
+		});
+
 		try {
 			const hint = new NextRequestHint({
 				init: request,
 				input: request,
 				page: PAGE,
 			});
-
 			const response = await render(hint);
-
 			return response;
 		} catch (e) {
 			console.log("error");
