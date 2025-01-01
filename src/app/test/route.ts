@@ -1,11 +1,11 @@
 export const GET = async (request: Request) => {
 	console.log(new Error().stack);
-	console.log("cool");
+	console.log('cool');
 
-	return new Response("Hello, World!", {
+	return new Response('Hello, World!', {
 		status: 200,
 		headers: {
-			"content-type": "text/plain",
+			'content-type': 'text/plain',
 		},
 	});
 };
