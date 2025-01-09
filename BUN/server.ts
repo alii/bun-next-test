@@ -52,6 +52,7 @@ export interface BunNextServerOptions {
 	appPathsManifest: PagesManifest;
 	nextFontManifest: NextFontManifest;
 	middlewareManifest: MiddlewareManifest;
+	prerenderManifest: PrerenderManifest;
 	/**
 	 * Must be an absolute path
 	 */
@@ -154,7 +155,7 @@ export class BunNextServer extends BaseServer<
 	);
 
 	protected getPrerenderManifest() {
-		return this.prerenderManifest;
+		return this.serverOptions.prerenderManifest;
 	}
 
 	protected getNextFontManifest(): DeepReadonly<NextFontManifest> | undefined {

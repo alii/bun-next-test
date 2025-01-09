@@ -1,18 +1,17 @@
 import {fileURLToPath} from 'bun';
-import {loadComponents} from 'next/dist/server/load-components';
-import {AppPageRouteModule} from 'next/dist/server/route-modules/app-page/module.compiled';
+import type {MiddlewareManifest} from 'next/dist/build/webpack/plugins/middleware-plugin';
 import {BunNextRequest} from './BUN/http/req';
-// import {BunNextResponse} from './BUN/http/res';
-import {WebNextResponse} from 'next/dist/server/base-http/web';
-import {ManifestRouter} from './BUN/manifest-router';
+import {BunNextResponse} from './BUN/http/res';
+import {BunNextServer} from './BUN/server';
+import {conf} from './conf';
+
+import {PrerenderManifest} from 'next/dist/build';
+import prerenderManifest from './.next/prerender-manifest.json' with {type: 'json'};
+import appPathsManifest from './.next/server/app-paths-manifest.json' with {type: 'json'};
+import middlewareManifest from './.next/server/middleware-manifest.json' with {type: 'json'};
+import nextFontManifest from './.next/server/next-font-manifest.json' with {type: 'json'};
 
 const BUILD_ID = await Bun.file('./.next/BUILD_ID').text();
-
-const appPathsManifest = (await import('./.next/server/app-paths-manifest.json', {
-	with: {type: 'json'},
-})) as {};
-
-const router = new ManifestRouter(appPathsManifest);
 
 const staticAssets: Record<`/${string}`, Response> = {};
 
@@ -53,141 +52,33 @@ for await (const i of [...publicFiles, ...assets]) {
 	});
 }
 
-const reallyBad404 = new Response('Not found', {
-	status: 404,
-	headers: {'content-type': 'text/plain'},
-});
-
 const DIST_DIR = fileURLToPath(import.meta.resolve('./.next'));
 
-// TODO: Faster way to do this
-function byteLength(payload: string): number {
-	return new TextEncoder().encode(payload).buffer.byteLength;
-}
+const server = new BunNextServer({
+	conf,
+	appPathsManifest,
+	nextFontManifest,
+	prerenderManifest: prerenderManifest as {} as PrerenderManifest,
+	middlewareManifest: middlewareManifest as MiddlewareManifest,
+	distDir: DIST_DIR,
+	buildId: BUILD_ID,
+	publicDir: 'public',
+});
+
+const handle = server.getRequestHandler();
 
 Bun.serve({
 	port: 3000,
-
-	// error: async error => {
-	// 	console.log(error, 'test');
-	// 	return new Response('failed');
-	// },
-
 	static: staticAssets,
 
-	fetch: async request => {
-		const url = new URL(request.url);
-		const match = router.match(url);
+	fetch: async rawRequest => {
+		const url = new URL(rawRequest.url);
+		const request = new BunNextRequest(url, rawRequest);
+		const response = new BunNextResponse();
 
-		if (!match) {
-			return reallyBad404; // this is a really bad 404, beacuse ideally we actually always match a 404
-		}
+		await handle(request, response);
 
-		const components = await loadComponents({
-			distDir: DIST_DIR,
-			page: match.page,
-			isAppPath: true,
-			isDev: false,
-		});
-
-		const bunRequest = new BunNextRequest(url, request);
-		const bunResponse = new WebNextResponse();
-		// const bunResponse = new BunNextResponse();
-
-		// const routeModule = opts.routeModule as AppPageRouteModule;
-
-		const query = Object.fromEntries(url.searchParams.entries());
-
-		// const render = getRender({
-		// 	pagesType: 'app' as import('next/dist/lib/page-types').PAGE_TYPES,
-		// 	dev: false,
-		// 	page: match.page,
-		// 	pageMod,
-		// 	appMod: _app,
-		// 	errorMod: _error,
-		// 	error500Mod: undefined,
-		// 	Document: _document.default,
-		// 	buildManifest,
-		// 	reactLoadableManifest,
-		// 	config: nextConfig,
-		// 	buildId: BUILD_ID,
-		// 	nextFontManifest: fontManifest,
-		// 	incrementalCacheHandler: undefined,
-		// 	renderToHTML,
-		// 	clientReferenceManifest,
-		// });
-
-		try {
-			// await renderToHTMLOrFlight(
-			const result = await (components.routeModule as AppPageRouteModule).render(
-				bunRequest,
-				bunResponse,
-				{
-					page: match.page,
-					query,
-					fallbackRouteParams: null,
-					params: match.params,
-					renderOpts: {
-						...components,
-						previewProps: undefined,
-						buildId: BUILD_ID,
-						basePath: components.page,
-						trailingSlash: false,
-						supportsDynamicResponse: true,
-						experimental: {
-							isRoutePPREnabled: undefined,
-							expireTime: undefined,
-							clientTraceMetadata: undefined,
-							dynamicIO: false,
-							inlineCss: false,
-							authInterrupts: false,
-						},
-						reactMaxHeadersLength: undefined,
-						waitUntil: undefined,
-						onClose: cb => bunResponse.onClose(cb),
-						onAfterTaskError: undefined,
-					},
-				},
-			);
-
-			if (result.contentType) {
-				bunResponse.setHeader(
-					'Content-Type',
-					result.contentType ? result.contentType : 'text/html; charset=utf-8',
-				);
-			}
-
-			// const s = new TransformStream({
-			// 	transform: (chunk, c) => {
-			// 		console.log({chunk});
-			// 		c.enqueue(chunk);
-			// 	},
-			// });
-
-			// result.pipeTo(s.writable);
-
-			let promise: Promise<void> | undefined;
-			if (result.isDynamic) {
-				promise = result.pipeTo(bunResponse.transformStream.writable);
-			} else {
-				const payload = result.toUnchunkedString();
-				bunResponse.setHeader('Content-Length', String(byteLength(payload)));
-				// if (options.generateEtags) {
-				// 	res.setHeader('ETag', generateETag(payload));
-				//
-				bunResponse.body(payload);
-			}
-
-			bunResponse.send();
-
-			if (promise) await promise;
-
-			return new Response(bunResponse.transformStream.readable);
-		} catch (e) {
-			console.log('error');
-			console.log(e);
-			return new Response('failed');
-		}
+		return await response.toResponse();
 	},
 });
 
