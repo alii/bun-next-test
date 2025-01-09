@@ -12,41 +12,32 @@ interface RouteMatch {
 interface CompiledRoute {
 	matcher: (pathname: string) => false | Params;
 	modulePath: string;
-	page: string;
+	route: string;
 }
 
 export class ManifestRouter {
-	private staticRoutes = new Map<string, {modulePath: string; page: string}>();
+	private staticRoutes = new Map<string, {modulePath: string; route: string}>();
 	private dynamicRoutes = new Map<string, CompiledRoute>();
 
-	constructor(private readonly routesManifest: Record<string, string>) {
+	public constructor(private readonly routesManifest: Record<string, string>) {
 		for (const [route, modulePath] of Object.entries(this.routesManifest)) {
-			console.log({route});
-
 			const normalizedRoute = removeTrailingSlash(route)
-				.replace(/\/route$/, '')
-				.replace(/\/page$/, '');
+				.replace(/\/route$/, '/')
+				.replace(/\/page$/, '/');
 
-			const withFirstSlash = normalizedRoute.startsWith('/')
-				? normalizedRoute
-				: `/${normalizedRoute}`;
-
-			if (!withFirstSlash.includes('[')) {
-				this.staticRoutes.set(withFirstSlash, {
-					modulePath,
-					page: route,
-				});
+			if (!normalizedRoute.includes('[')) {
+				this.staticRoutes.set(normalizedRoute, {modulePath, route});
 
 				continue;
 			}
 
-			const regex = getRouteRegex(withFirstSlash);
+			const regex = getRouteRegex(normalizedRoute);
 			const matcher = getRouteMatcher(regex);
 
-			this.dynamicRoutes.set(withFirstSlash, {
+			this.dynamicRoutes.set(normalizedRoute, {
 				matcher,
 				modulePath,
-				page: route,
+				route,
 			});
 		}
 	}
@@ -71,28 +62,24 @@ export class ManifestRouter {
 	public match(url: URL): RouteMatch | null {
 		const pathname = removeTrailingSlash(url.pathname);
 
-		// Try static routes first
 		const staticMatch = this.staticRoutes.get(pathname);
 
 		if (staticMatch) {
 			return {
 				modulePath: staticMatch.modulePath,
 				params: {},
-				page: staticMatch.page,
+				page: staticMatch.route,
 			};
 		}
 
-		// Try dynamic routes
 		for (const [_, route] of this.dynamicRoutes) {
 			const params = route.matcher(pathname);
-
-			console.log({params, route});
 
 			if (params !== false) {
 				return {
 					modulePath: route.modulePath,
 					params,
-					page: route.page,
+					page: route.route,
 				};
 			}
 		}
