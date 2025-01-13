@@ -5,6 +5,8 @@ import * as Log from 'next/dist/build/output/log';
 import {MiddlewareManifest} from 'next/dist/build/webpack/plugins/middleware-plugin';
 import {NextFontManifest} from 'next/dist/build/webpack/plugins/next-font-manifest-plugin';
 import {PagesManifest} from 'next/dist/build/webpack/plugins/pages-manifest-plugin';
+import {buildCustomRoute} from 'next/dist/lib/build-custom-route';
+import {Rewrite} from 'next/dist/lib/load-custom-routes';
 import {AppSharedContext, renderToHTMLOrFlight} from 'next/dist/server/app-render/app-render';
 import BaseServer, {
 	FindComponentsResult,
@@ -62,6 +64,7 @@ export interface BunNextServerOptions {
 	middlewareManifest: MiddlewareManifest;
 	prerenderManifest: PrerenderManifest;
 	appSharedContext: AppSharedContext;
+	interceptionRouteRewrites: Rewrite[];
 }
 
 export class BunNextServer extends BaseServer<
@@ -116,7 +119,11 @@ export class BunNextServer extends BaseServer<
 	}
 
 	protected getinterceptionRoutePatterns(): RegExp[] {
-		return this.interceptionRoutePatterns;
+		return (
+			this.serverOptions.interceptionRouteRewrites?.map(
+				rewrite => new RegExp(buildCustomRoute('rewrite', rewrite).regex),
+			) ?? []
+		);
 	}
 
 	protected getEnabledDirectories(): NextEnabledDirectories {
