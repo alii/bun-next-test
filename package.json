@@ -2,6 +2,7 @@
 	"name": "bun-next-test",
 	"version": "0.1.0",
 	"private": true,
+	"type": "module",
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
@@ -9,7 +10,9 @@
 		"lint": "next lint"
 	},
 	"dependencies": {
-		"next": "/Users/ali/code/next.js/packages/next/next-15.1.1-canary.7.tgz",
+		"@kaito-http/uws": "^3.0.1",
+		"@opentelemetry/api": "^1.9.0",
+		"next": "/Users/ali/code/next.js/packages/next/next-15.2.0-canary.2.tgz",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0",
 		"react-server-dom-webpack": "^19.0.0"
@@ -21,7 +24,7 @@
 		"@types/react-dom": "^19",
 		"alistair": "^1.12.0",
 		"prettier": "^3.4.2",
+		"tsx": "^4.19.2",
 		"typescript": "^5"
-	},
-	"packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+	}
 }

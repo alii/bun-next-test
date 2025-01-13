@@ -1,12 +1,18 @@
-import {BaseNextResponse} from 'next/dist/server/base-http';
-import {toNodeOutgoingHttpHeaders} from 'next/dist/server/web/utils';
-import {CloseController, trackBodyConsumed} from 'next/dist/server/web/web-on-close';
+import {BaseNextResponse} from 'next/dist/server/base-http/index.js';
+import {toNodeOutgoingHttpHeaders} from 'next/dist/server/web/utils.js';
+import {CloseController, trackBodyConsumed} from 'next/dist/server/web/web-on-close.js';
 import {OutgoingHttpHeaders} from 'node:http';
-import {deferred} from '../util';
+import {deferred} from '../util.ts';
 
 export class BunNextResponse extends BaseNextResponse<WritableStream> {
 	private headers = new Headers();
 	private textBody: string | undefined = undefined;
+
+	// Hack because Next.js uses `.originalResponse` to patch res.setHeader support when it thinks we are using Node.js
+	// because the check for Node.js is actually terrible and doesn't actually check the response is a Node.js response at all
+	get originalResponse() {
+		return this;
+	}
 
 	private readonly closeController = new CloseController();
 
@@ -58,6 +64,10 @@ export class BunNextResponse extends BaseNextResponse<WritableStream> {
 
 	public getHeaders(): OutgoingHttpHeaders {
 		return toNodeOutgoingHttpHeaders(this.headers);
+	}
+
+	public getNormalHeaders() {
+		return this.headers;
 	}
 
 	public hasHeader(name: string): boolean {

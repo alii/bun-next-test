@@ -119,7 +119,6 @@ export const conf = {
 		staticGenerationMinPagesPerWorker: 25,
 		dynamicIO: false,
 		inlineCss: false,
-		newDevOverlay: false,
 		optimizePackageImports: [
 			'lucide-react',
 			'date-fns',

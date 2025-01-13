@@ -1,17 +1,19 @@
-import {loadEnvConfig} from '@next/env';
+import * as nextEnv from '@next/env';
 import {NextConfig} from 'next';
 import {PrerenderManifest} from 'next/dist/build';
 import * as Log from 'next/dist/build/output/log';
 import {MiddlewareManifest} from 'next/dist/build/webpack/plugins/middleware-plugin';
 import {NextFontManifest} from 'next/dist/build/webpack/plugins/next-font-manifest-plugin';
 import {PagesManifest} from 'next/dist/build/webpack/plugins/pages-manifest-plugin';
-import {renderToHTMLOrFlight} from 'next/dist/server/app-render/app-render';
+import {AppSharedContext, renderToHTMLOrFlight} from 'next/dist/server/app-render/app-render';
 import BaseServer, {
 	FindComponentsResult,
 	LoadedRenderOpts,
 	MiddlewareRoutingItem,
 	NextEnabledDirectories,
+	NoFallbackError,
 	NormalizedRouteManifest,
+	RouteHandler,
 } from 'next/dist/server/base-server';
 import {generateETag} from 'next/dist/server/lib/etag';
 import {IncrementalCache} from 'next/dist/server/lib/incremental-cache';
@@ -21,6 +23,7 @@ import {loadManifest} from 'next/dist/server/load-manifest';
 import RenderResult, {AppPageRenderResultMetadata} from 'next/dist/server/render-result';
 import {
 	addRequestMeta,
+	getRequestMeta,
 	NextParsedUrlQuery,
 	NextUrlWithParsedQuery,
 } from 'next/dist/server/request-meta';
@@ -28,12 +31,13 @@ import {Params} from 'next/dist/server/request/params';
 import {getMaybePagePath} from 'next/dist/server/require';
 import ResponseCache, {ResponseCacheBase} from 'next/dist/server/response-cache';
 import {PagesAPIRouteMatch} from 'next/dist/server/route-matches/pages-api-route-match';
-import {PRERENDER_MANIFEST, ROUTES_MANIFEST} from 'next/dist/shared/lib/constants';
+import {ROUTES_MANIFEST} from 'next/dist/shared/lib/constants';
 import {DeepReadonly} from 'next/dist/shared/lib/deep-readonly';
 import {
 	getMiddlewareRouteMatcher,
 	MiddlewareRouteMatch,
 } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
+import {removeTrailingSlash} from 'next/dist/shared/lib/router/utils/remove-trailing-slash';
 import {join} from 'node:path';
 import {ParsedUrlQuery} from 'querystring';
 import {BunNextRequest} from './http/req';
@@ -47,18 +51,17 @@ export interface BunNextServerOptions {
 
 	//////////////////////////////////
 
+	/**
+	 * Must be an absolute path
+	 */
+	distDir: string;
 	buildId: string;
 	publicDir: string;
 	appPathsManifest: PagesManifest;
 	nextFontManifest: NextFontManifest;
 	middlewareManifest: MiddlewareManifest;
 	prerenderManifest: PrerenderManifest;
-	/**
-	 * Must be an absolute path
-	 */
-	distDir: string;
-
-	//////////////////////////////////
+	appSharedContext: AppSharedContext;
 }
 
 export class BunNextServer extends BaseServer<
@@ -135,6 +138,7 @@ export class BunNextServer extends BaseServer<
 			page: options.page,
 			isAppPath: true,
 			isDev: false,
+			sriEnabled: false,
 		});
 
 		if (!result) {
@@ -150,15 +154,11 @@ export class BunNextServer extends BaseServer<
 		};
 	}
 
-	private readonly prerenderManifest = loadManifest<PrerenderManifest>(
-		join(this.distDir, PRERENDER_MANIFEST),
-	);
-
 	protected getPrerenderManifest() {
 		return this.serverOptions.prerenderManifest;
 	}
 
-	protected getNextFontManifest(): DeepReadonly<NextFontManifest> | undefined {
+	protected getNextFontManifest(): DeepReadonly<NextFontManifest> {
 		return this.serverOptions.nextFontManifest;
 	}
 
@@ -192,7 +192,7 @@ export class BunNextServer extends BaseServer<
 		// Add necessary headers.
 		// @TODO: Share the isomorphic logic with server/send-payload.ts.
 		if (options.poweredByHeader && options.type === 'html') {
-			res.setHeader('X-Powered-By', 'Next.js');
+			res.setHeader('X-Powered-By', 'Next.js with Bun.sh');
 		}
 
 		if (!res.getHeader('Content-Type')) {
@@ -229,6 +229,7 @@ export class BunNextServer extends BaseServer<
 	protected async runApi(
 		req: BunNextRequest,
 		res: BunNextResponse,
+		// res: BunNextResponse,
 		query: ParsedUrlQuery,
 		match: PagesAPIRouteMatch,
 	): Promise<boolean> {
@@ -259,6 +260,7 @@ export class BunNextServer extends BaseServer<
 			renderOpts,
 			undefined,
 			false,
+			this.serverOptions.appSharedContext,
 		);
 
 		return result;
@@ -273,7 +275,7 @@ export class BunNextServer extends BaseServer<
 		const dev = !!this.renderOpts.dev;
 		// incremental-cache is request specific
 		// although can have shared caches in module scope
-		// per-cache handler
+		// per-cache  r
 		return new IncrementalCache({
 			dev,
 			requestHeaders,
@@ -294,7 +296,7 @@ export class BunNextServer extends BaseServer<
 	}
 
 	protected loadEnvConfig({dev, forceReload}: {dev: boolean; forceReload?: boolean}): void {
-		loadEnvConfig(this.dir, dev, Log, forceReload);
+		nextEnv.loadEnvConfig(this.dir, dev, Log, forceReload);
 	}
 
 	protected async handleUpgrade(): Promise<void> {
@@ -356,4 +358,65 @@ export class BunNextServer extends BaseServer<
 
 		return {...manifest, rewrites};
 	}
+
+	protected handleCatchallRenderRequest: RouteHandler<BunNextRequest, BunNextResponse> = async (
+		req,
+		res,
+		parsedUrl,
+	) => {
+		console.log('FUCK');
+
+		let {pathname, query} = parsedUrl;
+		if (!pathname) {
+			throw new Error('pathname is undefined');
+		}
+
+		// // interpolate query information into page for dynamic route
+		// // so that rewritten paths are handled properly
+		// const normalizedPage = this.serverOptions.webServerConfig.pathname;
+
+		// if (pathname !== normalizedPage) {
+		// 	pathname = normalizedPage;
+
+		// 	if (isDynamicRoute(pathname)) {
+		// 		const routeRegex = getNamedRouteRegex(pathname, false);
+		// 		const dynamicRouteMatcher = getRouteMatcher(routeRegex);
+		// 		const defaultRouteMatches = dynamicRouteMatcher(pathname) as NextParsedUrlQuery;
+		// 		const paramsResult = normalizeDynamicRouteParams(
+		// 			query,
+		// 			false,
+		// 			routeRegex,
+		// 			defaultRouteMatches,
+		// 		);
+		// 		const normalizedParams = paramsResult.hasValidParams ? paramsResult.params : query;
+
+		// 		pathname = interpolateDynamicPath(pathname, normalizedParams, routeRegex);
+		// 		normalizeVercelUrl(req, true, Object.keys(routeRegex.routeKeys), true, routeRegex);
+		// 	}
+		// }
+
+		// next.js core assumes page path without trailing slash
+		pathname = removeTrailingSlash(pathname);
+
+		if (this.i18nProvider) {
+			const {detectedLocale} = this.i18nProvider.analyze(pathname);
+
+			if (detectedLocale) {
+				addRequestMeta(req, 'locale', detectedLocale);
+			}
+		}
+
+		const bubbleNoFallback = getRequestMeta(req, 'bubbleNoFallback');
+
+		try {
+			await this.render(req, res, pathname, query, parsedUrl, true);
+
+			return true;
+		} catch (err) {
+			if (err instanceof NoFallbackError && bubbleNoFallback) {
+				return false;
+			}
+			throw err;
+		}
+	};
 }
