@@ -251,28 +251,6 @@ export class BunNextServer extends BaseServer<
 		return true;
 	}
 
-	protected async renderHTML(
-		req: BunNextRequest,
-		res: BunNextResponse,
-		pathname: string,
-		query: NextParsedUrlQuery,
-		renderOpts: LoadedRenderOpts,
-	): Promise<RenderResult<AppPageRenderResultMetadata>> {
-		const result = await renderToHTMLOrFlight(
-			req,
-			res,
-			pathname,
-			query,
-			null,
-			renderOpts,
-			undefined,
-			false,
-			this.serverOptions.appSharedContext,
-		);
-
-		return result;
-	}
-
 	protected async getIncrementalCache({
 		requestHeaders,
 	}: {
@@ -364,6 +342,36 @@ export class BunNextServer extends BaseServer<
 		}
 
 		return {...manifest, rewrites};
+	}
+
+	protected async renderHTML(
+		req: BunNextRequest,
+		res: BunNextResponse,
+		pathname: string,
+		query: NextParsedUrlQuery,
+		renderOpts: LoadedRenderOpts,
+	): Promise<RenderResult<AppPageRenderResultMetadata>> {
+		console.log('renderHTML');
+
+		const result = await renderToHTMLOrFlight(
+			req,
+			res,
+			pathname,
+			query,
+			null,
+			renderOpts,
+			undefined,
+			false,
+			this.serverOptions.appSharedContext,
+		);
+
+		console.log('renderHTML', result);
+
+		return result;
+	}
+
+	public getRenderHTMLFn() {
+		return this.renderHTML;
 	}
 
 	protected handleCatchallRenderRequest: RouteHandler<BunNextRequest, BunNextResponse> = async (
