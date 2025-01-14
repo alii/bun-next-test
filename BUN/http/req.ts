@@ -1,4 +1,5 @@
-import {BaseNextRequest, type FetchMetric} from 'next/dist/server/base-http/index.js';
+import {BaseNextRequest, type FetchMetric} from 'next/dist/server/base-http';
+import {NextRequest} from 'next/server';
 
 export class BunNextRequest extends BaseNextRequest<ReadableStream<Uint8Array> | null> {
 	private readonly request: Request;
@@ -13,5 +14,9 @@ export class BunNextRequest extends BaseNextRequest<ReadableStream<Uint8Array> |
 
 	public get headers() {
 		return Object.fromEntries([...this.request.headers.entries()]);
+	}
+
+	public toNextRequest(): NextRequest {
+		return new NextRequest(this.request);
 	}
 }

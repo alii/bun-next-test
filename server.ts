@@ -50,6 +50,8 @@ const DIST_DIR = fileURLToPath(import.meta.resolve('./.next'));
 const server = new BunNextServer({
 	conf,
 
+	interceptionRouteRewrites: [],
+
 	distDir: DIST_DIR,
 	buildId: BUILD_ID,
 	publicDir: 'public',
