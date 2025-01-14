@@ -371,8 +371,6 @@ export class BunNextServer extends BaseServer<
 		res,
 		parsedUrl,
 	) => {
-		console.log('FUCK');
-
 		let {pathname, query} = parsedUrl;
 		if (!pathname) {
 			throw new Error('pathname is undefined');
