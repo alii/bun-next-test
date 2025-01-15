@@ -2,10 +2,10 @@ import type {PrerenderManifest} from 'next/dist/build';
 import * as Log from 'next/dist/build/output/log';
 import type {MiddlewareManifest} from 'next/dist/build/webpack/plugins/middleware-plugin';
 import {fileURLToPath} from 'node:url';
-import {BunNextRequest} from './BUN/http/req.ts';
-import {BunNextResponse} from './BUN/http/res.ts';
-import {BunNextServer} from './BUN/server.ts';
 import {conf} from './conf.ts';
+
+import {BunNextRequest, BunNextResponse} from 'next/dist/server/base-http/bun';
+import {BunNextServer} from 'next/dist/server/bun-server';
 
 import prerenderManifest from './.next/prerender-manifest.json' with {type: 'json'};
 import appPathsManifest from './.next/server/app-paths-manifest.json' with {type: 'json'};
