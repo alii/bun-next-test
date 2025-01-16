@@ -7,6 +7,7 @@ import {conf} from './conf.ts';
 import {BunNextRequest, BunNextResponse} from 'next/dist/server/base-http/bun';
 import {BunNextServer} from 'next/dist/server/bun-server';
 
+import {CLIENT_PUBLIC_FILES_PATH} from 'next/dist/shared/lib/constants';
 import prerenderManifest from './.next/prerender-manifest.json' with {type: 'json'};
 import appPathsManifest from './.next/server/app-paths-manifest.json' with {type: 'json'};
 import middlewareManifest from './.next/server/middleware-manifest.json' with {type: 'json'};
@@ -54,7 +55,7 @@ const server = new BunNextServer({
 
 	distDir: DIST_DIR,
 	buildId: BUILD_ID,
-	publicDir: 'public',
+	publicDir: CLIENT_PUBLIC_FILES_PATH,
 
 	appPathsManifest,
 	nextFontManifest,
