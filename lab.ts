@@ -4,7 +4,7 @@ import {BunNextServer} from '/Users/ali/code/next.js/packages/next/src/server/bu
 
 const server = await BunNextServer.start({
 	conf,
-	dir: fileURLToPath(new URL('./.next/bun', import.meta.url)),
+	dir: fileURLToPath(new URL('./', import.meta.url)),
 	port: 3000,
 	hostname: 'localhost',
 });
