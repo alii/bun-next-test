@@ -1,7 +1,6 @@
+const mycoolstack = new Error().stack;
 export const GET = async (request: Request) => {
-	console.log(new Error().stack);
-
-	return new Response('Hello, World!', {
+	return new Response(mycoolstack, {
 		status: 200,
 		headers: {
 			'content-type': 'text/plain',
